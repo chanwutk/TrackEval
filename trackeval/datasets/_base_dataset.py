@@ -261,7 +261,10 @@ class _BaseDataset(ABC):
             bboxes2[:, 2] = bboxes2[:, 0] + bboxes2[:, 2]
             bboxes2[:, 3] = bboxes2[:, 1] + bboxes2[:, 3]
         elif box_format not in 'x0y0x1y1':
-            raise (TrackEvalException('box_format %s is not implemented' % box_format))
+            bboxes1 = deepcopy(bboxes1)
+            bboxes2 = deepcopy(bboxes2)
+            # if len(bboxes1) == 0 or len(bboxes2) == 0:
+            #     return np.zeros((len(bboxes1), len(bboxes2)))
 
         # layout: (x0, y0, x1, y1)
         min_ = np.minimum(bboxes1[:, np.newaxis, :], bboxes2[np.newaxis, :, :])

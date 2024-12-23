@@ -79,14 +79,24 @@ if __name__ == '__main__':
     dataset_config = {k: v for k, v in config.items() if k in default_dataset_config.keys()}
     metrics_config = {k: v for k, v in config.items() if k in default_metrics_config.keys()}
 
-    # Run code
-    evaluator = trackeval.Evaluator(eval_config)
-    dataset_list = [trackeval.datasets.B3D(dataset_config)]
-    metrics_list = []
-    # for metric in [trackeval.metrics.HOTA, trackeval.metrics.CLEAR, trackeval.metrics.Identity, trackeval.metrics.VACE]:
-    for metric in [trackeval.metrics.HOTA]:
-        if metric.get_name() in metrics_config['METRICS']:
-            metrics_list.append(metric(metrics_config))
-    if len(metrics_list) == 0:
-        raise Exception('No metrics selected for evaluation')
-    evaluator.evaluate(dataset_list, metrics_list)
+    for region in ['lane', 'intersection']:
+        for rr in [2, 4, 8, 16]:
+            print('rr', rr)
+            dconfig = {
+                **dataset_config,
+                "output_sub_fol": f'{region}_{rr}',
+                "input_gt": f'data/b3d/{region}/gt_{rr}.json',
+                "input_track": f'data/b3d/{region}/track_{rr}.json'
+            }
+
+            # Run code
+            evaluator = trackeval.Evaluator(eval_config)
+            dataset_list = [trackeval.datasets.B3D(dataset_config)]
+            metrics_list = []
+            # for metric in [trackeval.metrics.HOTA, trackeval.metrics.CLEAR, trackeval.metrics.Identity, trackeval.metrics.VACE]:
+            for metric in [trackeval.metrics.HOTA]:
+                if metric.get_name() in metrics_config['METRICS']:
+                    metrics_list.append(metric(metrics_config))
+            if len(metrics_list) == 0:
+                raise Exception('No metrics selected for evaluation')
+            evaluator.evaluate(dataset_list, metrics_list)

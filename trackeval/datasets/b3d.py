@@ -6,9 +6,6 @@ from ._base_dataset import _BaseDataset
 from .. import _timing
 
 
-LIMIT = 5000
-
-
 class B3D(_BaseDataset):
     """Dataset class for MOT Challenge 2D bounding box tracking"""
 
@@ -16,13 +13,18 @@ class B3D(_BaseDataset):
     def get_default_dataset_config():
         return {}
 
-    def __init__(self, config=None):
+    def __init__(self, config: "dict | None" = None):
         """Initialise dataset, checking that all required files are present"""
         super().__init__()
         self.tracker_list = ['SORT']
         self.seq_list = ['']
         self.class_list = ['car']
-        self.output_fol, self.output_sub_fol = 'output-eval', 'not_interpolated_tracks'
+
+        config = {} if config is None else config
+        self.output_fol = config.get('output_fol', 'output-eval')
+        self.output_sub_fol = config.get('output_sub_fol', None)
+        self.input_gt = config['input_gt']
+        self.input_track = config['input_track']
 
     def get_display_name(self, tracker):
         return 'SORT'
@@ -41,7 +43,7 @@ class B3D(_BaseDataset):
         """
         data = {}
         if is_gt:
-            file = 'tracks.jsonl'
+            file = self.input_gt
             with open(file, 'r') as f:
                 lines = f.readlines()
             
@@ -53,15 +55,13 @@ class B3D(_BaseDataset):
             data['gt_extras'] = []
 
             for idx, line in enumerate(lines):
-                if idx > LIMIT:
-                    break
-                line = json.loads(line)
-                assert idx == int(line[0])
+                t = json.loads(line)
+                assert idx == int(t['frame_idx']), (idx, t['frame_idx'])
                 gt_ids = []
                 gt_classes = []
                 gt_dets = []
                 gt_extras = []
-                for det in line[1]:
+                for det in t['tracks']:
                     gt_ids.append(det[0])
                     gt_classes.append(0)
                     gt_dets.append(det[1:])
@@ -75,39 +75,42 @@ class B3D(_BaseDataset):
             data['seq'] = seq
             return data
         else:
-            file = self.output_sub_fol + '.jsonl'
+            file = self.input_track
             with open(file, 'r') as f:
                 trajectories = f.readlines()
-            
-            tracks = {}
-            for tid, t in enumerate(trajectories):
-                _, trajectory = json.loads(t)
-                for det in trajectory:
-                    frame = det[0]
-                    if frame > LIMIT:
-                        continue
-                    box = det[1]
-                    if frame not in tracks:
-                        tracks[frame] = []
-                    tracks[frame].append([tid, box])
-            
-            data['num_timesteps'] = max(tracks.keys()) + 1
             data['tracker_ids'] = []
             data['tracker_classes'] = []
             data['tracker_dets'] = []
             data['tracker_confidences'] = []
 
-            for t in range(data['num_timesteps']):
-                if t in tracks:
-                    data['tracker_ids'].append(np.array([det[0] for det in tracks[t]], dtype=int))
-                    data['tracker_dets'].append(np.array([det[1] for det in tracks[t]]))
-                    data['tracker_classes'].append(np.array([0 for _ in range(len(tracks[t]))], dtype=int))
-                    data['tracker_confidences'].append(np.array([1 for _ in range(len(tracks[t]))]))
-                else:
-                    data['tracker_ids'].append(np.zeros((0,), dtype=int))
-                    data['tracker_dets'].append(np.zeros((0, 4)))
-                    data['tracker_classes'].append(np.zeros((0,), dtype=int))
-                    data['tracker_confidences'].append(np.ones((0,)))
+            idx = 0
+            for l in trajectories:
+                try:
+                    t = json.loads(l)
+                    frame_idx = t['frame_idx']
+                    assert frame_idx == idx, (frame_idx, idx)
+
+                    t = np.array(t['tracks'], dtype=float)
+                    n, dim = t.shape
+
+                    data['tracker_ids'].append(t[:, 0])
+                    data['tracker_dets'].append(t[:, 1:5])
+
+                    tracker_classes = np.zeros((n,), dtype=int)
+                    if dim > 5:
+                        tracker_classes = t[:, 5].astype(int)
+                    data['tracker_classes'].append(tracker_classes)
+                    
+                    tracker_confidences = np.ones((n,), dtype=float)
+                    if dim > 6:
+                        tracker_confidences = t[:, 6]
+                    data['tracker_confidences'].append(tracker_confidences)
+
+                    idx += 1
+                    data['num_timesteps'] = idx
+                except Exception as e:
+                    if len(l) != 0:
+                        raise e
             
             data['seq'] = seq
             return data

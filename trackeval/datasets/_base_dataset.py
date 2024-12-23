@@ -266,6 +266,10 @@ class _BaseDataset(ABC):
             # if len(bboxes1) == 0 or len(bboxes2) == 0:
             #     return np.zeros((len(bboxes1), len(bboxes2)))
 
+        if len(bboxes1) == 0:
+            bboxes1 = np.zeros((0, 4))
+        if len(bboxes2) == 0:
+            bboxes2 = np.zeros((0, 4))
         # layout: (x0, y0, x1, y1)
         min_ = np.minimum(bboxes1[:, np.newaxis, :], bboxes2[np.newaxis, :, :])
         max_ = np.maximum(bboxes1[:, np.newaxis, :], bboxes2[np.newaxis, :, :])

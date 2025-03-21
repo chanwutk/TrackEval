@@ -37,11 +37,16 @@ import sys
 import os
 import argparse
 from multiprocessing import freeze_support
+import multiprocessing as mp
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import trackeval  # noqa: E402
 
-if __name__ == '__main__':
+
+PIPELINE_DIR = 'pipeline-stages'
+
+
+def main():
     freeze_support()
 
     # Command line interface:
@@ -79,24 +84,50 @@ if __name__ == '__main__':
     dataset_config = {k: v for k, v in config.items() if k in default_dataset_config.keys()}
     metrics_config = {k: v for k, v in config.items() if k in default_metrics_config.keys()}
 
-    for region in ['lane', 'intersection']:
-        for rr in [2, 4, 8, 16]:
-            print('rr', rr)
-            dconfig = {
-                **dataset_config,
-                "output_sub_fol": f'{region}_{rr}',
-                "input_gt": f'data/b3d/{region}/gt_{rr}.json',
-                "input_track": f'data/b3d/{region}/track_{rr}.json'
-            }
+    processes = []
+    for tracker in ['SORT', 'DeepSORT']:
+        print('tracker', tracker)
+        result_dir = os.path.join(PIPELINE_DIR, f'track-results-{tracker.lower()}')
+        for file in os.listdir(result_dir):
+            if file.endswith('.jsonl') and '.r.' in file:
+                process = mp.Process(target=run_benchmark, args=(tracker, file, dataset_config, eval_config, metrics_config))
+                process.start()
+                processes.append(process)
+    
+    for process in processes:
+        process.join()
+    for process in processes:
+        process.terminate()
 
-            # Run code
-            evaluator = trackeval.Evaluator(eval_config)
-            dataset_list = [trackeval.datasets.B3D(dataset_config)]
-            metrics_list = []
-            # for metric in [trackeval.metrics.HOTA, trackeval.metrics.CLEAR, trackeval.metrics.Identity, trackeval.metrics.VACE]:
-            for metric in [trackeval.metrics.HOTA]:
-                if metric.get_name() in metrics_config['METRICS']:
-                    metrics_list.append(metric(metrics_config))
-            if len(metrics_list) == 0:
-                raise Exception('No metrics selected for evaluation')
-            evaluator.evaluate(dataset_list, metrics_list)
+
+def run_benchmark(tracker: str, file: str, dataset_config: dict, eval_config: dict, metrics_config: dict):
+    # matrices = [trackeval.metrics.HOTA, trackeval.metrics.CLEAR, trackeval.metrics.Identity, trackeval.metrics.VACE]:
+    matrices = [trackeval.metrics.HOTA]
+
+    skip = int(file.split('.r.')[1][:-len('.jsonl')])
+    sub_fol = f'{tracker}-{file.split(".r.")[0] + f".r.{skip:03d}.jsonl"}'
+
+    dconfig = {
+        **dataset_config,
+        "output_fol": os.path.join(PIPELINE_DIR, f'track-accuracy-{tracker.lower()}'),
+        "output_sub_fol": sub_fol,
+        "input_gt": os.path.join(PIPELINE_DIR, f'track-results-{tracker.lower()}', file.split('.r.')[0] + '.r.1.jsonl'),
+        "input_track": os.path.join(PIPELINE_DIR, f'track-results-{tracker.lower()}', file),
+        "skip": skip,
+        'tracker': tracker,
+    }
+
+    # Run code
+    evaluator = trackeval.Evaluator(eval_config)
+    dataset_list = [trackeval.datasets.B3D(dconfig)]
+    metrics_list = []
+    for metric in matrices:
+        if metric.get_name() in metrics_config['METRICS']:
+            metrics_list.append(metric(metrics_config))
+    if len(metrics_list) == 0:
+        raise Exception('No metrics selected for evaluation')
+    evaluator.evaluate(dataset_list, metrics_list)
+
+
+if __name__ == '__main__':
+    main()

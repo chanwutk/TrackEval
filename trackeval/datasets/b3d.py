@@ -16,7 +16,7 @@ class B3D(_BaseDataset):
     def __init__(self, config: "dict | None" = None):
         """Initialise dataset, checking that all required files are present"""
         super().__init__()
-        self.tracker_list = ['SORT']
+        self.tracker_list = ['xsort']
         self.seq_list = ['']
         self.class_list = ['car']
 
@@ -25,9 +25,11 @@ class B3D(_BaseDataset):
         self.output_sub_fol = config.get('output_sub_fol', None)
         self.input_gt = config['input_gt']
         self.input_track = config['input_track']
+        self.skip = config['skip']
+        self.tracker = config['tracker']
 
     def get_display_name(self, tracker):
-        return 'SORT'
+        return tracker
 
     def _load_raw_file(self, tracker, seq: str, is_gt: bool):
         """Load a file (gt or tracker) in the MOT Challenge 2D box format
@@ -56,12 +58,16 @@ class B3D(_BaseDataset):
 
             for idx, line in enumerate(lines):
                 t = json.loads(line)
-                assert idx == int(t['frame_idx']), (idx, t['frame_idx'])
+                frame_idx, dets = t
+                if frame_idx % self.skip != 0:
+                    idx += 1
+                    continue
+                assert frame_idx == idx, (frame_idx, idx)
                 gt_ids = []
                 gt_classes = []
                 gt_dets = []
                 gt_extras = []
-                for det in t['tracks']:
+                for det in dets:
                     gt_ids.append(det[0])
                     gt_classes.append(0)
                     gt_dets.append(det[1:])
@@ -87,13 +93,16 @@ class B3D(_BaseDataset):
             for l in trajectories:
                 try:
                     t = json.loads(l)
-                    frame_idx = t['frame_idx']
-                    assert frame_idx == idx, (frame_idx, idx)
+                    frame_idx, tracks = t
 
-                    t = np.array(t['tracks'], dtype=float)
+                    assert idx == int(frame_idx) / self.skip, (idx, frame_idx, self.skip, seq, self.input_gt)
+
+                    t = np.array(tracks, dtype=float)
+                    if len(t) == 0:
+                        t = np.empty((0, 5))
                     n, dim = t.shape
 
-                    data['tracker_ids'].append(t[:, 0])
+                    data['tracker_ids'].append(t[:, 0].astype(int))
                     data['tracker_dets'].append(t[:, 1:5])
 
                     tracker_classes = np.zeros((n,), dtype=int)

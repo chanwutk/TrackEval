@@ -25,20 +25,20 @@ class _BaseDataset(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_default_dataset_config():
+    def get_default_dataset_config() -> dict:
         ...
 
     @abstractmethod
-    def _load_raw_file(self, tracker, seq, is_gt):
+    def _load_raw_file(self, tracker, seq, is_gt) -> dict:
         ...
 
     @_timing.time
     @abstractmethod
-    def get_preprocessed_seq_data(self, raw_data, cls):
+    def get_preprocessed_seq_data(self, raw_data, cls) -> dict:
         ...
 
     @abstractmethod
-    def _calculate_similarities(self, gt_dets_t, tracker_dets_t):
+    def _calculate_similarities(self, gt_dets_t, tracker_dets_t) -> np.ndarray:
         ...
 
     # Helper functions for all datasets:

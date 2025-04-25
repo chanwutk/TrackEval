@@ -196,5 +196,4 @@ class B3D(_BaseDataset):
         return data
 
     def _calculate_similarities(self, gt_dets_t, tracker_dets_t):
-        similarity_scores = self._calculate_box_ious(gt_dets_t, tracker_dets_t, box_format='x0y0x1y1')
-        return similarity_scores
+        return self._calculate_box_ious(gt_dets_t, tracker_dets_t, box_format='x0y0x1y1')

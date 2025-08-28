@@ -16,11 +16,11 @@ class B3D(_BaseDataset):
     def __init__(self, config: "dict | None" = None):
         """Initialise dataset, checking that all required files are present"""
         super().__init__()
-        self.tracker_list = ['xsort']
-        self.seq_list = ['']
+        config = {} if config is None else config
+        self.tracker_list = config.get('tracker_list', ['xsort'])
+        self.seq_list = config.get('seq_list', [''])
         self.class_list = ['car']
 
-        config = {} if config is None else config
         self.output_fol = config.get('output_fol', 'output-eval')
         self.output_sub_fol = config.get('output_sub_fol', None)
         self.input_gt = config['input_gt']

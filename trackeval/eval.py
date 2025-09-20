@@ -66,9 +66,10 @@ class Evaluator:
             output_res[dataset_name] = {}
             output_msg[dataset_name] = {}
             tracker_list, seq_list, class_list = dataset.get_eval_info()
-            print('\nEvaluating %i tracker(s) on %i sequence(s) for %i class(es) on %s dataset using the following '
-                  'metrics: %s\n' % (len(tracker_list), len(seq_list), len(class_list), dataset_name,
-                                     ', '.join(metric_names)))
+            if config['PRINT_CONFIG']:
+                print('\nEvaluating %i tracker(s) on %i sequence(s) for %i class(es) on %s dataset using the following '
+                    'metrics: %s\n' % (len(tracker_list), len(seq_list), len(class_list), dataset_name,
+                                        ', '.join(metric_names)))
 
             # Evaluate each tracker
             for tracker in tracker_list:
@@ -77,7 +78,8 @@ class Evaluator:
                     # Evaluate each sequence in parallel or in series.
                     # returns a nested dict (res), indexed like: res[seq][class][metric_name][sub_metric field]
                     # e.g. res[seq_0001][pedestrian][hota][DetA]
-                    print('\nEvaluating %s\n' % tracker)
+                    if config['PRINT_CONFIG']:
+                        print('\nEvaluating %s\n' % tracker)
                     time_start = time.time()
                     if config['USE_PARALLEL']:
                         if show_progressbar and TQDM_IMPORTED:
